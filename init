@@ -203,10 +203,9 @@ run_scripts /scripts/init-top
 
 maybe_break modules
 [ "$quiet" != "y" ] && log_begin_msg "Loading essential drivers"
+[ -n "${netconsole}" ] && modprobe netconsole netconsole="${netconsole}"
 load_modules
 [ "$quiet" != "y" ] && log_end_msg
-
-[ -n "${netconsole}" ] && modprobe netconsole netconsole="${netconsole}"
 
 maybe_break premount
 [ "$quiet" != "y" ] && log_begin_msg "Running /scripts/init-premount"
