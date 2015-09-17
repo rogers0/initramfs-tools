@@ -59,7 +59,13 @@ manual_add_modules()
 		return
 	fi
 
-	modprobe --all --set-version="${version}" --ignore-install --quiet --show-depends "$@" |
+	# modprobe --ignore-install inhibits processing of 'install'
+	# configuration lines, so that instead we will see 'insmod
+	# module.ko' as we want.  However it also means that 'softdep'
+	# configuration lines and embedded softdep information is not
+	# processed.  So we run twice, with and without this option.
+	{ modprobe --all --set-version="${version}" --ignore-install --quiet --show-depends "$@";
+	  modprobe --all --set-version="${version}" --quiet --show-depends "$@"; } |
 	while read prefix kmod options ; do
 		if [ "${prefix}" != "insmod" ]; then
 			continue
