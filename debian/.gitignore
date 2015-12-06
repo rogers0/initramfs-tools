@@ -2,3 +2,4 @@
 /*.debhelper.log
 /*.substvars
 /initramfs-tools/
+/initramfs-tools-core/
