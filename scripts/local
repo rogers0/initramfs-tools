@@ -88,25 +88,6 @@ local_device_setup()
 
 	# We've given up, but we'll let the user fix matters if they can
 	while [ ! -e "$1" ]; do
-		# give hint about renamed root
-		case "$1" in
-		/dev/hd*)
-			suffix="${1#/dev/hd}"
-			major="${suffix%[[:digit:]]}"
-			major="${major%[[:digit:]]}"
-			if [ -d "/sys/block/sd${major}" ]; then
-				echo "WARNING bootdevice may be renamed. Try $2=/dev/sd${suffix}"
-			fi
-			;;
-		/dev/sd*)
-			suffix="${1#/dev/sd}"
-			major="${suffix%[[:digit:]]}"
-			major="${major%[[:digit:]]}"
-			if [ -d "/sys/block/hd${major}" ]; then
-				echo "WARNING bootdevice may be renamed. Try $2=/dev/hd${suffix}"
-			fi
-			;;
-		esac
 		echo "Gave up waiting for $2 device.  Common problems:"
 		echo " - Boot args (cat /proc/cmdline)"
 		echo "   - Check rootdelay= (did the system wait long enough?)"
