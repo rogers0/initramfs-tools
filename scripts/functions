@@ -53,6 +53,9 @@ panic()
 	modprobe -v uhci-hcd || true
 	modprobe -v ohci-hcd || true
 	modprobe -v usbhid || true
+
+	run_scripts /scripts/panic
+
 	REASON="$@" PS1='(initramfs) ' /bin/sh -i </dev/console >/dev/console 2>&1
 }
 
