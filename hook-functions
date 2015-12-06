@@ -277,18 +277,10 @@ dep_add_modules_mount()
 	fi
 
 	# find out block device + fstype
-	eval "$( mount | while read -r dev foo mp foo fs opts rest ; do \
+	eval "$(while read dev mp fs opts rest ; do \
 		[ "$mp" = "$dir" ] && [ "$fs" != "rootfs" ] \
-		&& printf "dev_node='%s'\nFSTYPE='%s'" "$dev" "$fs" \
-		&& break; done)"
-
-	# On failure fallback to /proc/mounts if readable
-	if [ -z "$dev_node" ] && [ -r /proc/mounts ]; then
-		eval "$(while read dev mp fs opts rest ; do \
-			[ "$mp" = "$dir" ] && [ "$fs" != "rootfs" ] \
-			&& printf "dev_node=$dev\nFSTYPE=$fs"\
-			&& break; done < /proc/mounts)"
-	fi
+		&& printf "dev_node=$dev\nFSTYPE=$fs"\
+		&& break; done < /proc/mounts)"
 
 	# Only the root mountpoint has to exist; do nothing if any other
 	# directory is not a mountpoint.
