@@ -358,9 +358,12 @@ _checkfs_once()
 		force=""
 	fi
 
-	if [ "$fsckfix" = yes ]
+	if [ "$fsckfix" = "y" ]
 	then
 		fix="-y"
+	elif [ "$fsckfix" = "n" ]
+	then
+		fix="-n"
 	else
 		fix="-a"
 	fi
