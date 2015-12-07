@@ -117,7 +117,7 @@ for type in $fsck_types; do
 		continue
 	fi
 
-	prog="/sbin/fsck.${type}"
+	prog="$(command -v fsck.${type})"
 	if [ -h "$prog" ]; then
 		link=$(readlink -f "$prog")
 		copy_exec "$link"
