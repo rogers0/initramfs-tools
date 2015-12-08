@@ -202,12 +202,19 @@ copy_modules_dir()
 # walk /sys for relevant modules
 sys_walk_mod_add()
 {
-	local driver_path module
+	local driver_path module device_path modalias
 	device_path="$1"
 
-	sys_walk_modalias "${device_path}"
-
 	while [ "${device_path}" != "/sys" ]; do
+		# device modalias
+		if [ -e "${device_path}/modalias" ]; then
+			modalias=$(cat "${device_path}/modalias")
+			if [ -n "${modalias}" ]; then
+				force_load "${modalias}"
+			fi
+		fi
+
+		# current driver module
 		driver_path="$(readlink -f ${device_path}/driver/module)"
 		if [ -e "$driver_path" ]; then
 			module="$(basename $(readlink -f $driver_path))"
@@ -215,23 +222,7 @@ sys_walk_mod_add()
 				force_load "${module}"
 			fi
 		fi
-		device_path="$(dirname ${device_path})"
-	done
-}
 
-# walk /sys for relevant modalias
-sys_walk_modalias()
-{
-	local device_path modalias
-	device_path="$1"
-
-	while [ "${device_path}" != "/sys" ]; do
-		if [ -e "${device_path}/modalias" ]; then
-			modalias=$(cat "${device_path}/modalias")
-			if [ -n "${modalias}" ]; then
-				force_load "${modalias}"
-			fi
-		fi
 		device_path="$(dirname ${device_path})"
 	done
 }
@@ -474,7 +465,6 @@ dep_add_modules_mount()
 
 	# catch old-style IDE
 	if [ -e /sys/bus/ide/devices/ ]; then
-		sys_walk_modalias ${dev_sys_path}
 		modules="$modules ide-gd_mod ide-cd"
 	fi
 
