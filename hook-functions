@@ -227,105 +227,52 @@ sys_walk_mod_add()
 	done
 }
 
+block_dev_sys_walk_mod_add()
+{
+	local dev_sys_path disk_sys_path component
+
+	while true; do
+		# Resolve symlink so sys_walk_mod_add can walk up the hierarchy
+		dev_sys_path="$(readlink -f "$1")"
+
+		# Find whole disk from partition
+		if grep -q "^DEVTYPE=partition$" "$dev_sys_path/uevent"; then
+			disk_sys_path="$dev_sys_path/.."
+		else
+			disk_sys_path="$dev_sys_path"
+		fi
+
+		# Find first component of a layered device
+		component="$(ls -1 "$disk_sys_path/slaves" | head -n 1)"
+		if [ -z "$component" ]; then
+			break
+		fi
+
+		dev_sys_path="$disk_sys_path/slaves/$component"
+	done
+
+	sys_walk_mod_add ${dev_sys_path}
+}
+
 block_dev_mod_add()
 {
-	local block minor dev_node dev_sys_path
+	local dev_node dev_num dev_sys_path
 	dev_node="$1"
 
-	# lvm or luks device
-	if [ "${dev_node#/dev/mapper/}" != "${dev_node}" ] \
-		|| [ "${dev_node#/dev/dm-}" != "${dev_node}" ]; then
-		minor=$((0x$(stat --format "%T" ${dev_node}) % 256))
-		block=$(ls -1 /sys/block/dm-${minor}/slaves | head -n 1)
-		# lvm on luks or luks on lvm, possibly lvm snapshots
-		while [ "${block#dm-}" != "${block}" ]; do
-			block=$(ls -1 /sys/block/${block}/slaves | head -n 1)
-		done
-		# lvm on md or luks on md
-		if [ "${block#md}" != "${block}" ]; then
-			block=$(sed -ne 's/multipath/[/' -e 's/linear/[/' -e 's/raid[0-9][0-9]*/[/' -e 's/\([hs]d[a-z][a-z]*\)[0-9][0-9]*/\1/g' -e '/^'${block}' :/s/^[^[]*\[ \([^\[]*\)\[.*$/\1/p' </proc/mdstat)
-		fi
-		# luks or lvm on cciss or ida
-		if [ "${block#cciss}" != "${block}" ] \
-		|| [ "${block#ida}" != "${block}" ]; then
-			block="${block%p*}"
-		else
-			block=${block%%[0-9]*}
-		fi
-	# md device new naming scheme /dev/md/X
-	elif [ "${dev_node#/dev/md/}" != "${dev_node}" ]; then
-		dev_node=${dev_node#/dev/md/}
-		# strip partion number
-		dev_node=${dev_node%%p[0-9]*}
-		# drop the partition number only for sdX and hdX devices
-		# and keep it for other devices like loop#, dm-# devices
-		block=$(sed -ne 's/multipath/[/' -e 's/linear/[/' -e 's/raid[0-9][0-9]*/[/' -e 's/\([hs]d[a-z][a-z]*\)[0-9][0-9]*/\1/g' -e '/^md'$dev_node' :/s/^[^[]*\[ \([^\[]*\)\[.*$/\1/p' </proc/mdstat)
-	# md device /dev/mdX
-	elif [ "${dev_node#/dev/md}" != "${dev_node}" ]; then
-		dev_node=${dev_node#/dev/md}
-		# strip partion number
-		dev_node=${dev_node%%p[0-9]*}
-		# drop the partition number only for sdX and hdX devices
-		# and keep it for other devices like loop#, dm-# devices
-		block=$(sed -ne 's/multipath/[/' -e 's/linear/[/' -e 's/raid[0-9][0-9]*/[/' -e 's/\([hs]d[a-z][a-z]*\)[0-9][0-9]*/\1/g' -e '/^md'$dev_node' :/s/^[^[]*\[ \([^\[]*\)\[.*$/\1/p' </proc/mdstat)
-	# cciss device
-	elif [ "${dev_node#/dev/cciss/}" != "${dev_node}" ]; then
-		block=${dev_node#/dev/cciss/*}
-		block="cciss!${block%p*}"
-	# ida device
-	elif [ "${dev_node#/dev/ida/}" != "${dev_node}" ]; then
-		block=${dev_node#/dev/ida/*}
-		block="ida!${block%p*}"
-	# Xen virtual device /dev/xvdX
-	elif [ "${dev_node#/dev/xvd}" != "${dev_node}" ]; then
-		block=${dev_node#/dev/}
-		# Xen has a mode where only the individual partitions are
-		# registered with the kernel as well as the usual full disk
-		# with partition table scheme.
-		if [ ! -e /sys/block/${block} ] ; then
-			block=${block%%[0-9]*}
-		fi
-	# mmc device /dev/mmcblkXpX
-	elif [ "${dev_node#/dev/mmcblk}" != "${dev_node}" ]; then
-		block=${dev_node#/dev/}
-		block=${block%%p[0-9]*}
+	# Look up device number and convert to decimal as it appears in sysfs
+	dev_num="$(stat -c %t:%T "$dev_node")"
+	dev_num="$((0x${dev_num%:*})):$((0x${dev_num#*:}))"
 
-	# nbd device /dev/nbdXpX
-	elif [ "${dev_node#/dev/nbd}" != "${dev_node}" ]; then
-		block=${dev_node#/dev/}
-		block=${block%%p[0-9]*}
-
-	# DAC960 - good old mylex raid - device format /dev/rd/cXdXpX
-	elif [ "${dev_node#/dev/rd/c}" != "${dev_node}" ]; then
-		block="rd!c${dev_node#/dev/rd/c}"
-		block=${block%%p[0-9]*}
-
-	# etherd device
-	elif [ "${dev_node#/dev/etherd/}" != "${dev_node}" ]; then
-		block=${dev_node#/dev/etherd/*}
-		block="etherd!${block%p*}"
-	# i2o raid device
-	elif [ "${dev_node#/dev/i2o/}" != "${dev_node}" ]; then
-		block=${dev_node#/dev/i2o/}
-		block=${block%%[0-9]*}
-		block='i2o!'$block
-	# classical block device
-	else
-		block=${dev_node#/dev/}
-		block=${block%%[0-9]*}
-	fi
-
-	# Error out if /sys lack block dev
-	if [ -z "${block}" ] || [ ! -e /sys/block/${block} ]; then
-		echo "mkinitramfs: for device ${dev_node} missing ${block} /sys/block/ entry" >&2
+	# Look up device in sysfs
+	dev_sys_path="/sys/dev/block/$dev_num"
+	if [ ! -d "$dev_sys_path" ]; then
+		echo "mkinitramfs: for device ${dev_node} missing ${dev_sys_path}" >&2
 		echo "mkinitramfs: workaround is MODULES=most" >&2
 		echo "mkinitramfs: Error please report the bug" >&2
 		exit 1
 	fi
 
-	# sys walk ATA
-	dev_sys_path=$(readlink -f /sys/block/${block}/device)
-	sys_walk_mod_add ${dev_sys_path}
+	block_dev_sys_walk_mod_add "$dev_sys_path"
 }
 
 # Copy all loaded or built-in modules matching the given pattern.
