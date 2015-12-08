@@ -276,11 +276,6 @@ block_dev_mod_add()
 	elif [ "${dev_node#/dev/ida/}" != "${dev_node}" ]; then
 		block=${dev_node#/dev/ida/*}
 		block="ida!${block%p*}"
-	# loop device /dev/loopX
-	elif [ "${dev_node#/dev/loop}" != "${dev_node}" ]; then
-		dev_node=${dev_node#/dev/}
-		block=$(losetup -a \
-			| awk "/${dev_node}/{print substr(\$3, 7, 3); exit}")
 	# Xen virtual device /dev/xvdX
 	elif [ "${dev_node#/dev/xvd}" != "${dev_node}" ]; then
 		block=${dev_node#/dev/}
