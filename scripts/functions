@@ -103,23 +103,26 @@ load_modules()
 # lilo compatibility
 parse_numeric() {
 	case $1 in
-	"")
+	*:*)
+		# Does it match /[0-9]*:[0-9]*/?
+		minor=${1#*:}
+		major=${1%:*}
+		case $major$minor in
+		*[!0-9]*)
+			# No.
+			return
+			;;
+		esac
+		;;
+	"" | *[!A-Fa-f0-9]*)
+		# "", "/*", etc.
 		return
 		;;
-	/*)
-		return
-		;;
-	[0-9]*:[0-9]*)
-		minor=$(( ${1#*:} ))
-		major=$(( ${1%:*} ))
-		;;
-	[A-Fa-f0-9]*)
+	*)
+		# [A-Fa-f0-9]*
 		value=$(( 0x${1} ))
 		minor=$(( ${value} % 256 ))
 		major=$(( ${value} / 256 ))
-		;;
-	*)
-		return
 		;;
 	esac
 
