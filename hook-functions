@@ -231,24 +231,19 @@ block_dev_sys_walk_mod_add()
 {
 	local dev_sys_path disk_sys_path component
 
-	while true; do
-		# Resolve symlink so sys_walk_mod_add can walk up the hierarchy
-		dev_sys_path="$(readlink -f "$1")"
+	# Resolve symlink so sys_walk_mod_add can walk up the hierarchy
+	dev_sys_path="$(readlink -f "$1")"
 
-		# Find whole disk from partition
-		if grep -q "^DEVTYPE=partition$" "$dev_sys_path/uevent"; then
-			disk_sys_path="$dev_sys_path/.."
-		else
-			disk_sys_path="$dev_sys_path"
-		fi
+	# Find whole disk from partition
+	if grep -q "^DEVTYPE=partition$" "$dev_sys_path/uevent"; then
+		disk_sys_path="$dev_sys_path/.."
+	else
+		disk_sys_path="$dev_sys_path"
+	fi
 
-		# Find first component of a layered device
-		component="$(ls -1 "$disk_sys_path/slaves" | head -n 1)"
-		if [ -z "$component" ]; then
-			break
-		fi
-
-		dev_sys_path="$disk_sys_path/slaves/$component"
+	# Iterate over component of a layered device
+	ls -1 "$disk_sys_path/slaves" | while read component; do
+		block_dev_sys_walk_mod_add "$disk_sys_path/slaves/$component"
 	done
 
 	sys_walk_mod_add ${dev_sys_path}
