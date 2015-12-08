@@ -126,12 +126,7 @@ parse_numeric() {
 		;;
 	esac
 
-	if command -v udevd >/dev/null 2>&1; then
-		ROOT=/dev/block/${major}:${minor}
-	else
-		mknod -m 600 /dev/root b ${major} ${minor}
-		ROOT=/dev/root
-	fi
+	ROOT="$(readlink -f /dev/block/${major}:${minor})"
 }
 
 # Parameter: device node to check
