@@ -227,127 +227,10 @@ sys_walk_mod_add()
 	done
 }
 
-# Copy all loaded or built-in modules matching the given pattern.
-# Pattern mustn't include directory or '.ko' suffix but should use
-# '[-_]' to allow for differences in naming between /sys/module and
-# modules.builtin.
-add_loaded_modules()
+block_dev_mod_add()
 {
-	local pattern="$1"
-	local module
-	local builtin=/lib/modules/$(uname -r)/modules.builtin
-
-	for module in /sys/module/$pattern; do
-		if [ -d "$module" ]; then
-			manual_add_modules $(basename $module)
-		fi
-	done
-	if [ -f $builtin ]; then
-		while read module; do
-			case "$module" in
-			*/$pattern.ko)
-				manual_add_modules $(basename $module .ko)
-				;;
-			esac
-		done < $builtin
-	fi
-}
-
-# find and only copy modules relevant to a mountpoint
-dep_add_modules_mount()
-{
-	local dir block minor dev_node FSTYPE dev_sys_path
-	local modules=
-
-	dir="$1"
-
-	# require mounted sysfs
-	if [ ! -d /sys/devices/ ]; then
-		echo "mkinitramfs: MODULES dep requires mounted sysfs on /sys" >&2
-		exit 1
-	fi
-
-	# find out block device + fstype
-	eval "$( mount | while read -r dev foo mp foo fs opts rest ; do \
-		[ "$mp" = "$dir" ] && [ "$fs" != "rootfs" ] \
-		&& printf "dev_node='%s'\nFSTYPE='%s'" "$dev" "$fs" \
-		&& break; done)"
-
-	# On failure fallback to /proc/mounts if readable
-	if [ -z "$dev_node" ] && [ -r /proc/mounts ]; then
-		eval "$(while read dev mp fs opts rest ; do \
-			[ "$mp" = "$dir" ] && [ "$fs" != "rootfs" ] \
-			&& printf "dev_node=$dev\nFSTYPE=$fs"\
-			&& break; done < /proc/mounts)"
-	fi
-
-	# Only the root mountpoint has to exist; do nothing if any other
-	# directory is not a mountpoint.
-	if [ "$dir" != / ] && [ -z "$dev_node" ]; then
-		return
-	fi
-
-	# handle ubifs and return since ubifs is mounted on char devices
-	# but most of the commands below only work with block devices.
-	if [ "${FSTYPE}" = "ubifs" ]; then
-		manual_add_modules "${FSTYPE}"
-		return
-	fi
-
-	if [ "$dir" = / ] && [ "${dev_node}" = "/dev/root" ] ; then
-		if [ -b "${dev_node}" ]; then
-			# Match it to the canonical device name by UUID
-			dev_node="/dev/disk/by-uuid/"$(blkid -o value -s UUID ${dev_node}) 2>/dev/null
-		else
-			# Does not exist in our namespace, so look at the
-			# kernel command line
-			dev_node=
-			for arg in $(cat /proc/cmdline); do
-				case "$arg" in
-				root=*)
-					dev_node="${arg#root=}"
-					if [ "${dev_node#/dev/}" = "$dev_node" ]; then
-						dev_node="/dev/$dev_node"
-					fi
-					;;
-				--)
-					break
-					;;
-				*)
-					;;
-				esac
-			done
-		fi
-	fi
-
-	# recheck device
-	if [ -z "$dev_node" ] || ! dev_node="$(readlink -f ${dev_node})" \
-		|| ! [ -b "$dev_node" ]; then
-		echo "mkinitramfs: failed to determine device for $dir" >&2
-		echo "mkinitramfs: workaround is MODULES=most, check:" >&2
-		echo "grep -r MODULES /etc/initramfs-tools/" >&2
-		echo "" >&2
-		echo "Error please report bug on initramfs-tools" >&2
-		echo "Include the output of 'mount' and 'cat /proc/mounts'" >&2
-		exit 1
-	fi
-
-	# do not trust mount, check superblock
-	eval "$(/usr/lib/klibc/bin/fstype ${dev_node})"
-
-	# check that fstype fs recognition
-	if [ "${FSTYPE}" = "unknown" ]; then
-		FSTYPE=$(blkid -o value -s TYPE "${dev_node}")
-		if [  -z "${FSTYPE}" ]; then
-			echo "mkinitramfs: unknown fstype on device ${dev_node}" >&2
-			echo "mkinitramfs: workaround is MODULES=most" >&2
-			echo "Error please report bug on initramfs-tools" >&2
-			exit 1
-		fi
-	fi
-
-	# Add filesystem
-	modules="$modules ${FSTYPE}"
+	local block minor dev_node dev_sys_path
+	dev_node="$1"
 
 	# lvm or luks device
 	if [ "${dev_node#/dev/mapper/}" != "${dev_node}" ] \
@@ -448,6 +331,131 @@ dep_add_modules_mount()
 	# sys walk ATA
 	dev_sys_path=$(readlink -f /sys/block/${block}/device)
 	sys_walk_mod_add ${dev_sys_path}
+}
+
+# Copy all loaded or built-in modules matching the given pattern.
+# Pattern mustn't include directory or '.ko' suffix but should use
+# '[-_]' to allow for differences in naming between /sys/module and
+# modules.builtin.
+add_loaded_modules()
+{
+	local pattern="$1"
+	local module
+	local builtin=/lib/modules/$(uname -r)/modules.builtin
+
+	for module in /sys/module/$pattern; do
+		if [ -d "$module" ]; then
+			manual_add_modules $(basename $module)
+		fi
+	done
+	if [ -f $builtin ]; then
+		while read module; do
+			case "$module" in
+			*/$pattern.ko)
+				manual_add_modules $(basename $module .ko)
+				;;
+			esac
+		done < $builtin
+	fi
+}
+
+# find and only copy modules relevant to a mountpoint
+dep_add_modules_mount()
+{
+	local dir dev_node FSTYPE
+	local modules=
+
+	dir="$1"
+
+	# require mounted sysfs
+	if [ ! -d /sys/devices/ ]; then
+		echo "mkinitramfs: MODULES dep requires mounted sysfs on /sys" >&2
+		exit 1
+	fi
+
+	# find out block device + fstype
+	eval "$( mount | while read -r dev foo mp foo fs opts rest ; do \
+		[ "$mp" = "$dir" ] && [ "$fs" != "rootfs" ] \
+		&& printf "dev_node='%s'\nFSTYPE='%s'" "$dev" "$fs" \
+		&& break; done)"
+
+	# On failure fallback to /proc/mounts if readable
+	if [ -z "$dev_node" ] && [ -r /proc/mounts ]; then
+		eval "$(while read dev mp fs opts rest ; do \
+			[ "$mp" = "$dir" ] && [ "$fs" != "rootfs" ] \
+			&& printf "dev_node=$dev\nFSTYPE=$fs"\
+			&& break; done < /proc/mounts)"
+	fi
+
+	# Only the root mountpoint has to exist; do nothing if any other
+	# directory is not a mountpoint.
+	if [ "$dir" != / ] && [ -z "$dev_node" ]; then
+		return
+	fi
+
+	# handle ubifs and return since ubifs is mounted on char devices
+	# but most of the commands below only work with block devices.
+	if [ "${FSTYPE}" = "ubifs" ]; then
+		manual_add_modules "${FSTYPE}"
+		return
+	fi
+
+	if [ "$dir" = / ] && [ "${dev_node}" = "/dev/root" ] ; then
+		if [ -b "${dev_node}" ]; then
+			# Match it to the canonical device name by UUID
+			dev_node="/dev/disk/by-uuid/"$(blkid -o value -s UUID ${dev_node}) 2>/dev/null
+		else
+			# Does not exist in our namespace, so look at the
+			# kernel command line
+			dev_node=
+			for arg in $(cat /proc/cmdline); do
+				case "$arg" in
+				root=*)
+					dev_node="${arg#root=}"
+					if [ "${dev_node#/dev/}" = "$dev_node" ]; then
+						dev_node="/dev/$dev_node"
+					fi
+					;;
+				--)
+					break
+					;;
+				*)
+					;;
+				esac
+			done
+		fi
+	fi
+
+	# recheck device
+	if [ -z "$dev_node" ] || ! dev_node="$(readlink -f ${dev_node})" \
+		|| ! [ -b "$dev_node" ]; then
+		echo "mkinitramfs: failed to determine device for $dir" >&2
+		echo "mkinitramfs: workaround is MODULES=most, check:" >&2
+		echo "grep -r MODULES /etc/initramfs-tools/" >&2
+		echo "" >&2
+		echo "Error please report bug on initramfs-tools" >&2
+		echo "Include the output of 'mount' and 'cat /proc/mounts'" >&2
+		exit 1
+	fi
+
+	# do not trust mount, check superblock
+	eval "$(/usr/lib/klibc/bin/fstype ${dev_node})"
+
+	# check that fstype fs recognition
+	if [ "${FSTYPE}" = "unknown" ]; then
+		FSTYPE=$(blkid -o value -s TYPE "${dev_node}")
+		if [  -z "${FSTYPE}" ]; then
+			echo "mkinitramfs: unknown fstype on device ${dev_node}" >&2
+			echo "mkinitramfs: workaround is MODULES=most" >&2
+			echo "Error please report bug on initramfs-tools" >&2
+			exit 1
+		fi
+	fi
+
+	# Add filesystem
+	modules="$modules ${FSTYPE}"
+
+	block_dev_mod_add "$dev_node"
 
 	# sys walk some important device classes
 	for class in gpio phy regulator; do
