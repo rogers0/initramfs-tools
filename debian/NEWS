@@ -1,3 +1,13 @@
+initramfs-tools (0.121) UNRELEASED; urgency=medium
+
+  * If initramfs-tools is configured to use busybox but it is not
+    installed, mkinitramfs will now fail.  Previously it would quietly use
+    klibc instead, sometimes producing a broken initramfs.  You may need
+    to modify /etc/initramfs-tools/initramfs-tools.conf or install busybox
+    when upgrading.
+
+ -- Ben Hutchings <ben@decadent.org.uk>  Sun, 06 Dec 2015 02:58:35 +0000
+
 initramfs-tools (0.119) unstable; urgency=medium
 
   * The initramfs will now run fsck on the root filesystem before
