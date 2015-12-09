@@ -349,6 +349,10 @@ _checkfs_once()
 	TYPE=$(get_fstype "$1")
 
 	FSCKCODE=0
+	if ! command -v fsck >/dev/null 2>&1; then
+		log_warning_msg "fsck not present, so skipping $NAME file system"
+		return
+	fi
 	if [ "$fastboot" = "y" ] ; then
 		log_warning_msg "Fast boot enabled, so skipping $NAME file system check."
 		return

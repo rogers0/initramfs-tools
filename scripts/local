@@ -175,7 +175,9 @@ local_mount_fs()
 	# FIXME This has no error checking
 	modprobe "${MNT_TYPE}"
 
-	checkfs "$MNT_FSNAME" "$MNT_DIR"
+	if [ "$MNT_PASS" != 0 ]; then
+		checkfs "$MNT_FSNAME" "$MNT_DIR"
+	fi
 
 	# FIXME This has no error checking
 	# Mount filesystem
