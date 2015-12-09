@@ -573,6 +573,7 @@ auto_add_modules()
 		;;
 		block)
 			copy_modules_dir kernel/drivers/block
+			copy_modules_dir kernel/drivers/nvme
 		;;
 		ubi)
 			modules="$modules deflate zlib lzo ubi ubifs"
