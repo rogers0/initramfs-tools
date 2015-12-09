@@ -298,7 +298,7 @@ resolve_device() {
 	DEV="$1"
 
 	case "$DEV" in
-	LABEL=* | UUID=*)
+	LABEL=* | UUID=* | PARTLABEL=* | PARTUUID=*)
 		if command -v blkid >/dev/null 2>&1; then
 			DEV="$(blkid -l -t "$DEV" -o device)"
 		else
