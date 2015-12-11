@@ -71,15 +71,7 @@ manual_add_modules()
 			continue
 		fi
 
-		# Prune duplicates
-		if [ -e "${DESTDIR}/${kmod}" ]; then
-			continue
-		fi
-
-		install -Dpm 644 "$kmod" "${DESTDIR}/$kmod"
-		if [ "${verbose}" = "y" ]; then
-			echo "Adding module ${kmod}"
-		fi
+		copy_file module "${kmod}" || continue
 
 		# Add required firmware
 		for firmware in $(modinfo -k "${version}" -F firmware "${kmod}"); do
