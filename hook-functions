@@ -107,12 +107,10 @@ manual_add_modules()
 			fi
 
 			if [ -e "/lib/firmware/${version}/${firmware}" ]; then
-				copy_exec "/lib/firmware/${version}/${firmware}"
+				copy_file firmware \
+					"/lib/firmware/${version}/${firmware}"
 			else
-				copy_exec "/lib/firmware/${firmware}"
-			fi
-			if [ "${verbose}" = "y" ]; then
-				echo "Adding firmware ${firmware}"
+				copy_file firmware "/lib/firmware/${firmware}"
 			fi
 		done
 	done
