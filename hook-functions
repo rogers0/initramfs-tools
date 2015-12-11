@@ -118,30 +118,45 @@ manual_add_modules()
 	done
 }
 
-# $1 = file to copy to ramdisk
-# $2 (optional) Name for the file on the ramdisk
+# $1 = file type (for logging)
+# $2 = file to copy to ramdisk
+# $3 (optional) Name for the file on the ramdisk
 # Location of the image dir is assumed to be $DESTDIR
-# We never overwrite the target if it exists.
-copy_exec() {
-	local src target x nonoptlib
-	local libname dirname
+# If the target exists, we leave it and return 1.
+# On any other error, we return >1.
+copy_file() {
+	local type src target
 
-	src="${1}"
-	target="${2:-$1}"
+	type="${1}"
+	src="${2}"
+	target="${3:-$2}"
 
-	[ -f "${src}" ] || return 1
+	[ -f "${src}" ] || return 2
 
 	if [ -d "${DESTDIR}/${target}" ]; then
 		# check if already copied
-		[ -e "${DESTDIR}/$target/${src##*/}" ] && return 0
+		[ -e "${DESTDIR}/$target/${src##*/}" ] && return 1
 	else
-		[ -e "${DESTDIR}/$target" ] && return 0
+		[ -e "${DESTDIR}/$target" ] && return 1
 		#FIXME: inst_dir
 		mkdir -p "${DESTDIR}/${target%/*}"
 	fi
 
-	[ "${verbose}" = "y" ] && echo "Adding binary ${src}"
-	cp -pL "${src}" "${DESTDIR}/${target}"
+	[ "${verbose}" = "y" ] && echo "Adding ${type} ${src}"
+	cp -pL "${src}" "${DESTDIR}/${target}" || return $(($? + 1))
+}
+
+# $1 = executable to copy to ramdisk, with library dependencies
+# $2 (optional) Name for the file on the ramdisk
+# Location of the image dir is assumed to be $DESTDIR
+# We never overwrite the target if it exists.
+copy_exec() {
+	local src target x nonoptlib ret
+
+	src="${1}"
+	target="${2:-$1}"
+
+	copy_file binary "${src}" "${target}" || return $(($? - 1))
 
 	# Copy the dependant libraries
 	for x in $(ldd "${src}" 2>/dev/null | sed -e '
@@ -160,15 +175,10 @@ copy_exec() {
 			x="${nonoptlib}"
 		fi
 
-		libname=$(basename "${x}")
-		dirname=$(dirname "${x}")
-
-		# FIXME inst_lib
-		mkdir -p "${DESTDIR}/${dirname}"
-		if [ ! -e "${DESTDIR}/${dirname}/${libname}" ]; then
-			cp -pL "${x}" "${DESTDIR}/${dirname}"
-			[ "${verbose}" = "y" ] && echo "Adding library ${x}" || true
-		fi
+		copy_file library "${x}" || {
+			ret=$?
+			[ ${ret} = 1 ] || return $((ret - 1))
+		}
 	done
 }
 
