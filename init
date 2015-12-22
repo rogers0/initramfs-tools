@@ -79,7 +79,6 @@ for x in $(cat /proc/cmdline); do
 		;;
 	root=*)
 		ROOT=${x#root=}
-		ROOT=$(resolve_device "$ROOT")
 		if [ -z "${BOOT}" ] && [ "$ROOT" = "/dev/nfs" ]; then
 			BOOT=nfs
 		fi
