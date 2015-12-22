@@ -91,9 +91,8 @@ local_device_setup()
 		echo "Gave up waiting for $2 device.  Common problems:"
 		echo " - Boot args (cat /proc/cmdline)"
 		echo "   - Check rootdelay= (did the system wait long enough?)"
-	        # Only applies to root= and etc=:
-		if [ "${2#/}" = "$2" ]; then
-			echo "   - Check $2= (did the system wait for the right device?)"
+		if [ "$2" = root ]; then
+			echo "   - Check root= (did the system wait for the right device?)"
 		fi
 		echo " - Missing modules (cat /proc/modules; ls /dev)"
 		panic "ALERT!  $1 does not exist.  Dropping to a shell!"
