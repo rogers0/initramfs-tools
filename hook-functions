@@ -71,15 +71,7 @@ manual_add_modules()
 			continue
 		fi
 
-		# Prune duplicates
-		if [ -e "${DESTDIR}/${kmod}" ]; then
-			continue
-		fi
-
-		install -Dpm 644 "$kmod" "${DESTDIR}/$kmod"
-		if [ "${verbose}" = "y" ]; then
-			echo "Adding module ${kmod}"
-		fi
+		copy_file module "${kmod}" || continue
 
 		# Add required firmware
 		for firmware in $(modinfo -k "${version}" -F firmware "${kmod}"); do
@@ -107,41 +99,72 @@ manual_add_modules()
 			fi
 
 			if [ -e "/lib/firmware/${version}/${firmware}" ]; then
-				copy_exec "/lib/firmware/${version}/${firmware}"
+				copy_file firmware \
+					"/lib/firmware/${version}/${firmware}"
 			else
-				copy_exec "/lib/firmware/${firmware}"
-			fi
-			if [ "${verbose}" = "y" ]; then
-				echo "Adding firmware ${firmware}"
+				copy_file firmware "/lib/firmware/${firmware}"
 			fi
 		done
 	done
 }
 
-# $1 = file to copy to ramdisk
+# $1 = file type (for logging)
+# $2 = file to copy to ramdisk
+# $3 (optional) Name for the file on the ramdisk
+# Location of the image dir is assumed to be $DESTDIR
+# If the target exists, we leave it and return 1.
+# On any other error, we return >1.
+copy_file() {
+	local type src target link_target
+
+	type="${1}"
+	src="${2}"
+	target="${3:-$2}"
+
+	[ -f "${src}" ] || return 2
+
+	if [ -d "${DESTDIR}/${target}" ]; then
+		target="${target}/${src##*/}"
+	fi
+
+	# check if already copied
+	[ -e "${DESTDIR}/${target}" ] && return 1
+
+	#FIXME: inst_dir
+	mkdir -p "${DESTDIR}/${target%/*}"
+
+	if [ -h "${src}" ]; then
+		[ "${verbose}" = "y" ] && echo "Adding ${type}-link ${src}"
+
+		# We don't need to replicate a chain of links completely;
+		# just link directly to the ultimate target.  Create a
+		# relative link so it always points to the right place.
+		link_target="$(readlink -f "${src}")" || return $(($? + 1))
+		ln -rs "${DESTDIR}/${link_target}" "${DESTDIR}/${target}"
+
+		# Copy the link target if it doesn't already exist
+		src="${link_target}"
+		target="${link_target}"
+		[ -e "${DESTDIR}/${target}" ] && return 1
+		mkdir -p "${DESTDIR}/${target%/*}"
+	fi
+
+	[ "${verbose}" = "y" ] && echo "Adding ${type} ${src}"
+
+	cp -pP "${src}" "${DESTDIR}/${target}" || return $(($? + 1))
+}
+
+# $1 = executable to copy to ramdisk, with library dependencies
 # $2 (optional) Name for the file on the ramdisk
 # Location of the image dir is assumed to be $DESTDIR
 # We never overwrite the target if it exists.
 copy_exec() {
-	local src target x nonoptlib
-	local libname dirname
+	local src target x nonoptlib ret
 
 	src="${1}"
 	target="${2:-$1}"
 
-	[ -f "${src}" ] || return 1
-
-	if [ -d "${DESTDIR}/${target}" ]; then
-		# check if already copied
-		[ -e "${DESTDIR}/$target/${src##*/}" ] && return 0
-	else
-		[ -e "${DESTDIR}/$target" ] && return 0
-		#FIXME: inst_dir
-		mkdir -p "${DESTDIR}/${target%/*}"
-	fi
-
-	[ "${verbose}" = "y" ] && echo "Adding binary ${src}"
-	cp -pL "${src}" "${DESTDIR}/${target}"
+	copy_file binary "${src}" "${target}" || return $(($? - 1))
 
 	# Copy the dependant libraries
 	for x in $(ldd "${src}" 2>/dev/null | sed -e '
@@ -160,15 +183,10 @@ copy_exec() {
 			x="${nonoptlib}"
 		fi
 
-		libname=$(basename "${x}")
-		dirname=$(dirname "${x}")
-
-		# FIXME inst_lib
-		mkdir -p "${DESTDIR}/${dirname}"
-		if [ ! -e "${DESTDIR}/${dirname}/${libname}" ]; then
-			cp -pL "${x}" "${DESTDIR}/${dirname}"
-			[ "${verbose}" = "y" ] && echo "Adding library ${x}" || true
-		fi
+		copy_file library "${x}" || {
+			ret=$?
+			[ ${ret} = 1 ] || return $((ret - 1))
+		}
 	done
 }
 

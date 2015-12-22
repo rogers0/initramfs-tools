@@ -117,12 +117,7 @@ for type in $fsck_types; do
 		continue
 	fi
 
-	prog="$(command -v fsck.${type})"
-	if [ -h "$prog" ]; then
-		link=$(readlink -f "$prog")
-		copy_exec "$link"
-		ln -s "$link" "${DESTDIR}/$prog"
-	elif [ -x "$prog" ] ; then
+	if prog="$(command -v fsck.${type})"; then
 		copy_exec "$prog"
 	else
 		echo "Warning: /sbin/fsck.${type} doesn't exist, can't install to initramfs, ignoring."
