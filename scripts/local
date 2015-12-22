@@ -42,6 +42,9 @@ local_bottom()
 # $2=optionname (for root and etc)
 local_device_setup()
 {
+	local dev="$1"
+	local name="$2"
+
 	wait_for_udev 10
 
 	# Load ubi with the correct MTD partition and return since fstype
@@ -53,7 +56,7 @@ local_device_setup()
 
 	# Don't wait for a root device that doesn't have a corresponding
 	# device in /dev (ie, mtd0)
-	if [ "${1#/dev}" = "$1" ]; then
+	if [ "${dev#/dev}" = "${dev}" ]; then
 		return
 	fi
 
@@ -61,8 +64,8 @@ local_device_setup()
 	# to allow for asynchronous device discovery (e.g. USB).  We
 	# also need to keep invoking the local-block scripts in case
 	# there are devices stacked on top of those.
-	if [ ! -e "$1" ] || ! $(get_fstype "$1" >/dev/null); then
-		log_begin_msg "Waiting for $2 file system"
+	if [ ! -e "${dev}" ] || ! $(get_fstype "${dev}" >/dev/null); then
+		log_begin_msg "Waiting for ${name} file system"
 
 		# Timeout is max(30, rootdelay) seconds (approximately)
 		slumber=30
@@ -72,8 +75,8 @@ local_device_setup()
 
 		while true; do
 			sleep 1
-			local_block "$1"
-			if [ -e "$1" ] && get_fstype "$1" >/dev/null; then
+			local_block "${dev}"
+			if [ -e "${dev}" ] && get_fstype "${dev}" >/dev/null; then
 				wait_for_udev 10
 				log_end_msg 0
 				break
@@ -87,15 +90,15 @@ local_device_setup()
 	fi
 
 	# We've given up, but we'll let the user fix matters if they can
-	while [ ! -e "$1" ]; do
-		echo "Gave up waiting for $2 device.  Common problems:"
+	while [ ! -e "${dev}" ]; do
+		echo "Gave up waiting for ${name} device.  Common problems:"
 		echo " - Boot args (cat /proc/cmdline)"
 		echo "   - Check rootdelay= (did the system wait long enough?)"
-		if [ "$2" = root ]; then
+		if [ "${name}" = root ]; then
 			echo "   - Check root= (did the system wait for the right device?)"
 		fi
 		echo " - Missing modules (cat /proc/modules; ls /dev)"
-		panic "ALERT!  $1 does not exist.  Dropping to a shell!"
+		panic "ALERT!  ${dev} does not exist.  Dropping to a shell!"
 	done
 }
 
