@@ -307,8 +307,7 @@ resolve_device() {
 		fi
 		;;
 	esac
-	[ -e "$DEV" ] || return 1
-	readlink -f "$DEV"
+	[ -e "$DEV" ] && echo "$DEV"
 }
 
 # Check a file system.
