@@ -300,15 +300,14 @@ resolve_device() {
 	case "$DEV" in
 	LABEL=* | UUID=* | PARTLABEL=* | PARTUUID=*)
 		if command -v blkid >/dev/null 2>&1; then
-			DEV="$(blkid -l -t "$DEV" -o device)"
+			DEV="$(blkid -l -t "$DEV" -o device)" || return 1
 		else
 			log_warning_msg "blkid not present, so cannot resolve $DEV"
+			return 1
 		fi
 		;;
 	esac
-	# Only canonicalise if a valid file, in case $DEV isn't a filename
-	[ -e "$DEV" ] && DEV=$(readlink -f "$DEV")
-	echo "$DEV"
+	[ -e "$DEV" ] && echo "$DEV"
 }
 
 # Check a file system.
