@@ -1,3 +1,9 @@
+initramfs-tools (0.121~rc3) UNRELEASED; urgency=medium
+
+  * debian/NEWS: Fix typo in reference to initramfs.conf configuration file
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 28 Dec 2015 14:02:36 +0100
+
 initramfs-tools (0.121~rc2) experimental; urgency=medium
 
   * Upload to experimental, not unstable
