@@ -97,6 +97,13 @@ load_modules()
 			if [ "$com" = "#" ]; then
 				continue
 			fi
+			if [ "x${m%%[[:space:]]*}" = "xnetconsole" ]; then
+				[ "x$debug" = "xy" -a -z "$netconsole" ] && exec >/dev/kmsg 2>&1
+				if [ "$m" = "netconsole" -a -n "$netconsole" ]; then
+					modprobe netconsole netconsole="$netconsole"
+					continue
+				fi
+			fi
 			modprobe $m
 		done
 	fi
